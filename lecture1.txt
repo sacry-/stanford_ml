@@ -1,0 +1,36 @@
+Need a calculus class:
+  deratives and infitesimals
+
+Hypothesis:
+  h(x) = t0 + t1*x
+
+  A Function that takes in two thetas and
+  estimates the value of theta0 and theta1
+  against the squared means error of the
+  training set with m data points and a
+  feature x explaining the output y
+
+  J(t0, t1) = 1/2m * sum(i=1 to m)( h(x(i)) - y(i) )^2
+
+  What we want is to minimize J
+
+Gradient Descent:
+  
+  solves: min J(t0,...tn)
+
+  1. Start with some t0 and t1 (t0=0, t1=0)
+
+  2. Repeat until convergence:
+
+  tj := tj - alpha*derative
+
+  deravitive = (d/d*tj)*J(t0,t1)
+    negative ( \ ) and positive slopes ( / ) relative to the chosen point 
+      negative slope = increasing thetaj
+      positive slope = decreasing thetaj
+  alpha = learning rate, how big are the steps
+
+  gradient descent approaching a local minimum will
+  take smaller steps as the deravitive descreases in slopes
+    -> it has no global sense, it is stuck at whats around
+      -> first local minimum that converges is just good enough
