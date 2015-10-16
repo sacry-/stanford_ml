@@ -10,6 +10,5 @@ for i = 1:m
     xi = theta(1) + theta(2) * X(i, 2);
     series = series + power(xi - y(i), 2);
 end
-
 J = (1/(2*m))*series;
 end
