@@ -62,30 +62,50 @@ Theta2_grad = zeros(size(Theta2));
 %               and Theta2_grad from Part 2.
 %
 
+% forward propagation
+I = eye(num_labels);
+y_matrix = I(y,:);
+a1 = [ones(m,1) X];
+z2 = a1*Theta1';
+a2 = [ones(size(z2,1),1) sigmoid(z2)];
+z3 = a2*Theta2';
+a3 = sigmoid(z3);
 
+% Cost
+p1 = -y_matrix .* real(log(a3));
+p2 = (1 - y_matrix) .* log(1 - a3);
+J = (1 / m) * dsum(p1 - p2);
 
+s = dsum(Theta1(:,2:end).^2) + dsum(Theta2(:,2:end).^2);
+regularized = (lambda / (2 * m)) * s;
+J = J + regularized;
 
+% back propagation
+d3 = a3 - y_matrix;
+d2 = d3 * Theta2(:,2:end) .* sigmoidGradient(z2);
+delta1 = (a1' * d2)';
+delta2 = d3' * a2;
 
+Theta1(:,1) = 0;
+Theta2(:,1) = 0;
+Theta1_reg = (lambda / m) * Theta1;
+Theta2_reg = (lambda / m) * Theta2;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-% -------------------------------------------------------------
-
-% =========================================================================
-
+Theta1_grad = (1 / m) * delta1 + Theta1_reg;
+Theta2_grad = (1 / m) * delta2 + Theta2_reg;
 % Unroll gradients
 grad = [Theta1_grad(:) ; Theta2_grad(:)];
 
+end
 
+function v = dsum(seq)
+    v = sum(sum(seq));
+end
+
+function v = h0(x, Theta1, Theta2)
+    a1 = x;
+    z2 = a1*Theta1';
+    a2 = [ones(size(z2,1),1) sigmoid(z2)];
+    z3 = a2*Theta2';
+    v = sigmoid(z3);
 end
