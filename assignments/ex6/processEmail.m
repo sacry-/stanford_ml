@@ -98,16 +98,12 @@ while ~isempty(email_contents)
     %
 
 
-
-
-
-
-
-
-
-
     % =============================================================
-
+    idxVec = find(strcmp(vocabList, str));
+    if length(idxVec) == 1
+        idx = idxVec(1);
+        word_indices = [word_indices ; idx];
+    end
 
     % Print to screen, ensuring that the output lines are not too long
     if (l + length(str) + 1) > 78
