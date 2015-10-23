@@ -20,11 +20,13 @@ idx = zeros(size(X,1), 1);
 %
 % Note: You can use a for-loop over the examples to compute this.
 %
-
-
-
-
-
+m = size(X,1);
+for i = 1:m
+    subtract = bsxfun(@minus, X(i,:), centroids);
+    mean_normalized = (1 / m) * sum(subtract.^2,2).^2;
+    [~, I] = min(mean_normalized);
+    idx(i) = I(1);
+end
 
 
 % =============================================================

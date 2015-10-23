@@ -4,6 +4,8 @@ import numpy as np
 import random
 import sys
 import matplotlib.pyplot as plt
+import math
+import pprint
 
 
 def create_sample(points=100, features=2):
@@ -26,77 +28,94 @@ def plotit(cl, x, name="K means"):
   plt.show()
 
 
-def initial_clusters(k, x):
-  s = random.sample(list(range(0,x.shape[0])), k)
-  return x[(np.array(s))]
+class KMeans():
 
-def sim(a, b):
-  return sum((a - b)**2)
+  def __init__(self, k, x):
+    self.k = k
+    self.x = x
+    self.num_iter = 10
+    self.c = None
+    self.centroids = None
+    self.steps = {}
 
-def find_closest_cluster(ck, point):
-  m = sim(point, ck[0])
-  cluster_idx = 0
-  for idx, cluster in enumerate(ck[1:]):
-    s = sim(point, cluster)
-    if s <= m:
-      m = s
-      cluster_idx = idx + 1
-  return cluster_idx
+  def initial_centroids(self):
+    space = list(range(0, self.x.shape[0]))
+    s = random.sample(space, self.k)
+    return self.x[(np.array(s))]
 
-def mean_of_points(c, x, j):
-  cids = [idx for idx, i in enumerate(c) if i == j]
-  return (1 / len(cids)) * sum(x[[cids]])
+  def find_closest_cluster(self, point):
+    m = self.sim( point, self.centroids[0] )
+    cluster_idx = 0
+    for idx, cluster in enumerate(self.centroids[1:]):
+      s = self.sim(point, cluster)
+      if s <= m:
+        m = s
+        cluster_idx = idx + 1
+    return cluster_idx
 
-def k_means(k, x, num_iter=25):
+  def run(self):
+    (m, n) = self.x.shape
+    self.c = np.zeros((m, 1), dtype=np.float32)
+    self.centroids = self.initial_centroids()
 
-  (m, n) = x.shape
-  c = np.zeros((m, 1), dtype=np.float32)
-  clusters = initial_clusters(k, x)
+    for iteration in range(0, self.num_iter):
+      for i in range(0, m):
+        self.c[i] = self.find_closest_cluster(x[i])
 
-  for _ in range(0, num_iter):
+      for j in range(0, k):
+        self.centroids[j] = self.mean_of_points(j) 
 
-    for i in range(0, m):
-      c[i] = find_closest_cluster(clusters, x[i])
+      self.steps[iteration] = self.centroids
 
-    for j in range(0, k):
-      clusters[j] = mean_of_points(c, x, j) 
+    return self.centroids, self.c
 
-  return clusters, c
+  def mean_of_points(self, j):
+    cids = [idx for idx, i in enumerate(self.c) if i == j]
+    return (1 / len(cids)) * sum(self.x[[cids]])
 
-def J(cl, c, x):
-  accu = 0
-  for idx, cidx in enumerate(c):
-    cidx = int(cidx)
-    inter = sum(x[idx] - cl[cidx])**2
-    accu += inter
-  return (1 / len(c)) * accu
+  def sim(self, a, b):
+    sum_squared = sum( (a - b)**2 )
+    return math.sqrt(sum_squared)**2
 
+  def J(self):
+    inter = 0
+    for idx, cidx in enumerate(self.c):
+      cidx = int(cidx)
+      inter = inter + self.sim(self.x[idx], self.centroids[cidx])
+    return (1 / len(self.c)) * inter
 
-def find_global_optimum(k, x, f, num_iter=1, samples=50):
-
-  cl, c = k_means(k, x, num_iter)
-  cost, idx = J(cl, c, x), 0
-
-  for i in range(0, samples - 1):
-
-    cl_, c_ = k_means(k, x, num_iter)
-    new_J = J(cl_, c_, x)
-
-    if f(new_J, cost):
-      cost, idx = new_J, i
-      cl, c = cl_, c_
-
-  return idx, cost, cl, c
+  def __repr__(self):
+    return "KMeans[k: {}, samples: {}, features: {}, num_iter: {}]".format(
+      self.k, 
+      self.x.shape[0], 
+      self.x.shape[1], 
+      self.num_iter
+    )
 
 
-k, x = 5, create_sample()
-min_idx, min_cost, cl_min, c_min = find_global_optimum(k, x, lambda a,b: a <= b, 1, 50)
-max_idx, max_cost, cl_max, c_max = find_global_optimum(k, x, lambda a,b: a >= b, 1, 50)
+def find_global_optimum(k, x, f, rounds=5):
+  kmeans = KMeans(k, x)
+  kmeans.run()
+  cost, idx = kmeans.J(), 1
+  best_kmeans = kmeans
 
-print(min_idx, min_cost, cl_min.shape, c_min.shape)
-print(max_idx, max_cost, cl_max.shape, c_max.shape)
+  for i in range(1, rounds):
+    for ki in range(k+1, k+5):
+      kmeans = KMeans(k, x)
+      kmeans.run()
+      new_J = kmeans.J()
 
-plotit(cl_min, x, "Minimum")
-plotit(cl_max, x, "Maximum")
+      if f(new_J, cost):
+        cost, idx = new_J, i + 1
+        best_kmeans = kmeans
 
+  return idx, best_kmeans
+
+
+k, x = 2, create_sample()
+min_idx, kmeans = find_global_optimum(k, x, lambda a,b: a <= b)
+
+print(str(kmeans), "Found in iteration: {}".format(min_idx))
+pprint.pprint(kmeans.steps)
+plotit(kmeans.centroids, kmeans.x, "Minimum")
 
