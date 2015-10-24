@@ -5,7 +5,7 @@ import random
 import sys
 import matplotlib.pyplot as plt
 import math
-import pprint
+import time
 
 
 def create_sample(points=100, features=2):
@@ -18,104 +18,107 @@ def create_sample(points=100, features=2):
   arr = np.concatenate((pt1, pt2, pt3))
   return np.array(arr, dtype=np.float32)
 
-def plotit(cl, x, name="K means"):
+def plotit(x, centroids, c):
+  plt.close()
   fig = plt.figure()
-  fig.suptitle(name, fontsize=15)
-  plt.scatter(cl[:,0].T, cl[:,1].T, s=200.0, c='r', marker='o', zorder=100)
+  fig.suptitle("K means", fontsize=15)
+  plt.scatter(centroids[:,0].T, centroids[:,1].T, s=200.0, c='r', marker='o', zorder=100)
   plt.plot(x[:,0], x[:,1], 'ko', zorder=-1)
   plt.xlabel('x1')
   plt.ylabel('x2')
-  plt.show()
+  plt.show(block=False)
+  time.sleep(1)
+
+def initial_outlier():
+  return np.array([
+    [4.0,0.0],
+    [0.0,4.0],
+    [4.0,4.0],
+    [4.1,4.1], 
+    [0.0,0.0]
+  ])
+
+def initial_centroids(x, k):
+  space = list(range(0, x.shape[0]))
+  s = random.sample(space, k-2)
+  return x[(np.array(s))]
+
+def assign_centroids(c, x, centroids, m):
+  similarity = lambda a,b,i: ((1 / m) * sim(a, b), i)
+  for i in range(0, m):
+    calc = [similarity(x[i], ce, idx) for idx, ce in enumerate(centroids)]
+    c[i] = min(calc, key=lambda x: x[0])[1]
+  return c
+
+def sim(a, b):
+  sum_squared = sum( (a - b)**2 )
+  return (sum_squared**2)
+
+def move_centroids(centroids, x, c, k):
+  for j in range(0, k):
+    cids = [idx for idx, i in enumerate(c) if i == j]
+    try:
+      centroids[j] = (1 / len(cids)) * sum(x[[cids]])
+    except:
+      continue
+  return centroids
+
+def converged(j_history, d):
+  if d > 2:
+    return (j_history[d-1] - j_history[d]) <= 0.000001
+  return False
+
+def kmeans(x, k, num_iter=25, printOut=False):
+  j_history = []
+  (m, n) = x.shape
+  c = np.zeros((m, 1), dtype=np.float32)
+  centroids = initial_centroids(x, k)
+    
+  if printOut: plotit(x, centroids, c)
+
+  for d in range(0, num_iter):
+    j_history.append( J(x, centroids, c) )
+    print( j_history[d] )
+
+    c = assign_centroids(c, x, centroids, m)
+    centroids = move_centroids(centroids, x, c, k)
+
+    if printOut: plotit(x, centroids, c)
+    if converged(j_history, d):
+      print("converged in round {}".format(d))
+      break
+
+  if printOut: plt.show()
+  return centroids, c
+
+def J(x, centroids, c):
+  inter, variation = 0, 0
+  (m, n) = x.shape
+  for idx, cidx in enumerate(c):
+    cidx = int(cidx)
+    inter = inter + sim(x[idx], centroids[cidx])
+    variation = variation + centroids[cidx]**2
+  inter = (1 / m) * inter
+  variation = (1 / m) * sum(variation)
+  return (inter / variation)
 
 
-class KMeans():
-
-  def __init__(self, k, x):
-    self.k = k
-    self.x = x
-    self.num_iter = 10
-    self.c = None
-    self.centroids = None
-    self.steps = {}
-
-  def initial_centroids(self):
-    space = list(range(0, self.x.shape[0]))
-    s = random.sample(space, self.k)
-    return self.x[(np.array(s))]
-
-  def find_closest_cluster(self, point):
-    m = self.sim( point, self.centroids[0] )
-    cluster_idx = 0
-    for idx, cluster in enumerate(self.centroids[1:]):
-      s = self.sim(point, cluster)
-      if s <= m:
-        m = s
-        cluster_idx = idx + 1
-    return cluster_idx
-
-  def run(self):
-    (m, n) = self.x.shape
-    self.c = np.zeros((m, 1), dtype=np.float32)
-    self.centroids = self.initial_centroids()
-
-    for iteration in range(0, self.num_iter):
-      for i in range(0, m):
-        self.c[i] = self.find_closest_cluster(x[i])
-
-      for j in range(0, k):
-        self.centroids[j] = self.mean_of_points(j) 
-
-      self.steps[iteration] = self.centroids
-
-    return self.centroids, self.c
-
-  def mean_of_points(self, j):
-    cids = [idx for idx, i in enumerate(self.c) if i == j]
-    return (1 / len(cids)) * sum(self.x[[cids]])
-
-  def sim(self, a, b):
-    sum_squared = sum( (a - b)**2 )
-    return math.sqrt(sum_squared)**2
-
-  def J(self):
-    inter = 0
-    for idx, cidx in enumerate(self.c):
-      cidx = int(cidx)
-      inter = inter + self.sim(self.x[idx], self.centroids[cidx])
-    return (1 / len(self.c)) * inter
-
-  def __repr__(self):
-    return "KMeans[k: {}, samples: {}, features: {}, num_iter: {}]".format(
-      self.k, 
-      self.x.shape[0], 
-      self.x.shape[1], 
-      self.num_iter
-    )
-
-
-def find_global_optimum(k, x, f, rounds=5):
-  kmeans = KMeans(k, x)
-  kmeans.run()
-  cost, idx = kmeans.J(), 1
-  best_kmeans = kmeans
+def find_global_optimum(x, k, f, rounds=10):
+  centroids, c = kmeans(x, k)
+  cost, idx = J(x, centroids, c), 1
 
   for i in range(1, rounds):
-    for ki in range(k+1, k+5):
-      kmeans = KMeans(k, x)
-      kmeans.run()
-      new_J = kmeans.J()
+    centroids_, c_ = kmeans(x, k)
+    new_J = J(x, centroids_, c_)
 
-      if f(new_J, cost):
-        cost, idx = new_J, i + 1
-        best_kmeans = kmeans
+    if f(new_J, cost):
+      cost, idx = new_J, i + 1
+      centroids, c = centroids_, c_
 
-  return idx, best_kmeans
+  return idx, cost, centroids, c
 
 
-k, x = 2, create_sample()
-min_idx, kmeans = find_global_optimum(k, x, lambda a,b: a <= b)
-
-print(str(kmeans), "Found in iteration: {}".format(min_idx))
-pprint.pprint(kmeans.steps)
-plotit(kmeans.centroids, kmeans.x, "Minimum")
+k, x = 5, create_sample()
+by_min = lambda a,b: a <= b
+idx, cost, centroids, c = find_global_optimum(x, k, by_min)
 
