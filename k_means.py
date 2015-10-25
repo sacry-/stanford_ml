@@ -8,6 +8,7 @@ import math
 import time
 
 
+# Helper
 def create_sample(points=100, features=2):
   dim = (points,features)
   pt1 = np.random.normal(1, 0.2, dim)
@@ -18,7 +19,7 @@ def create_sample(points=100, features=2):
   arr = np.concatenate((pt1, pt2, pt3))
   return np.array(arr, dtype=np.float32)
 
-def plotit(x, centroids, c):
+def plotit(x, centroids):
   plt.close()
   fig = plt.figure()
   fig.suptitle("K means", fontsize=15)
@@ -29,34 +30,24 @@ def plotit(x, centroids, c):
   plt.show(block=False)
   time.sleep(1)
 
-def initial_outlier():
-  return np.array([
-    [4.0,0.0],
-    [0.0,4.0],
-    [4.0,4.0],
-    [4.1,4.1], 
-    [0.0,0.0]
-  ])
 
+# Algorithm
 def initial_centroids(x, k):
   space = list(range(0, x.shape[0]))
-  s = random.sample(space, k-2)
-  return x[(np.array(s))]
+  s = random.sample(space, k)
+  return x[np.array(s)]
 
 def assign_centroids(c, x, centroids, m):
-  similarity = lambda a,b,i: ((1 / m) * sim(a, b), i)
   for i in range(0, m):
-    calc = [similarity(x[i], ce, idx) for idx, ce in enumerate(centroids)]
-    c[i] = min(calc, key=lambda x: x[0])[1]
+    c[i] = np.argmin((1 / m) * sim(x[i], centroids))
   return c
 
 def sim(a, b):
-  sum_squared = sum( (a - b)**2 )
-  return (sum_squared**2)
+  return np.sum( (a - b)**2, axis=1 )**2
 
 def move_centroids(centroids, x, c, k):
   for j in range(0, k):
-    cids = [idx for idx, i in enumerate(c) if i == j]
+    (cids, _) = np.where(c == j)
     try:
       centroids[j] = (1 / len(cids)) * sum(x[[cids]])
     except:
@@ -65,60 +56,68 @@ def move_centroids(centroids, x, c, k):
 
 def converged(j_history, d):
   if d > 2:
-    return (j_history[d-1] - j_history[d]) <= 0.000001
+    diff = (j_history[d-1][0] - j_history[d][0])
+    if diff < 0:
+      return False
+    return diff <= 0.000001
   return False
 
-def kmeans(x, k, num_iter=25, printOut=False):
+def kmeans(x, k, num_iter=25):
   j_history = []
   (m, n) = x.shape
   c = np.zeros((m, 1), dtype=np.float32)
   centroids = initial_centroids(x, k)
-    
-  if printOut: plotit(x, centroids, c)
 
   for d in range(0, num_iter):
-    j_history.append( J(x, centroids, c) )
-    print( j_history[d] )
+    cost = J(x, centroids, c)
+    j_history.append( (cost, centroids) )
+    print( cost )
 
     c = assign_centroids(c, x, centroids, m)
     centroids = move_centroids(centroids, x, c, k)
 
-    if printOut: plotit(x, centroids, c)
     if converged(j_history, d):
       print("converged in round {}".format(d))
       break
 
-  if printOut: plt.show()
-  return centroids, c
+  return centroids, c, j_history
 
 def J(x, centroids, c):
   inter, variation = 0, 0
   (m, n) = x.shape
   for idx, cidx in enumerate(c):
     cidx = int(cidx)
-    inter = inter + sim(x[idx], centroids[cidx])
+    inter = inter + sum( (x[idx] - centroids[cidx])**2 )**2
     variation = variation + centroids[cidx]**2
   inter = (1 / m) * inter
   variation = (1 / m) * sum(variation)
   return (inter / variation)
 
 
-def find_global_optimum(x, k, f, rounds=10):
-  centroids, c = kmeans(x, k)
+def find_global_optimum(x, f=lambda a,b: a <= b, k=1, k_iter=10, num_iter=5):
+  centroids, c, j_history = kmeans(x, k)
   cost, idx = J(x, centroids, c), 1
+  k_offset, k_best = 1, k
 
-  for i in range(1, rounds):
-    centroids_, c_ = kmeans(x, k)
-    new_J = J(x, centroids_, c_)
+  for i in range(0, num_iter):
+    for k_off in range(0, k_iter):
+      centroids_, c_, j_history_ = kmeans(x, k + k_off)
+      new_J = J(x, centroids_, c_)
 
-    if f(new_J, cost):
-      cost, idx = new_J, i + 1
-      centroids, c = centroids_, c_
+      if f(new_J, cost):
+        cost, idx, k_best, k_offset = new_J, i + 1, k + k_off, k_off
+        centroids, c, j_history = centroids_, c_, j_history_
 
-  return idx, cost, centroids, c
+  return idx, k_offset, k_best, cost, centroids, c, j_history
+
+def animate(j_history, x):
+  for (_, cent) in j_history:
+    plotit(x, cent)
+  plt.show()
 
 
-k, x = 5, create_sample()
-by_min = lambda a,b: a <= b
-idx, cost, centroids, c = find_global_optimum(x, k, by_min)
+x = create_sample()
+idx, k_offset, k, cost, centroids, c, j_history = find_global_optimum(x)
+print(idx, k_offset, idx*k_offset, cost, k)
+animate(j_history, x)
 
