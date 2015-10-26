@@ -4,120 +4,147 @@ import numpy as np
 import random
 import sys
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import math
 import time
+import six
 
 
 # Helper
-def create_sample(points=100, features=2):
-  dim = (points,features)
-  pt1 = np.random.normal(1, 0.2, dim)
-  pt2 = np.random.normal(2, 0.5, (300,2))
-  pt3 = np.random.normal(3, 0.3, dim)
-  pt2[:,0] += 1
-  pt3[:,0] -= 0.5
-  arr = np.concatenate((pt1, pt2, pt3))
-  return np.array(arr, dtype=np.float32)
+def create_sample(k, docs=400):
+  nums = [x for x in range(1,4)]
+  docs_per = docs / (k * 3)
+  accu = np.zeros((1,2))
 
-def plotit(x, centroids):
-  plt.close()
-  fig = plt.figure()
-  fig.suptitle("K means", fontsize=15)
-  plt.scatter(centroids[:,0].T, centroids[:,1].T, s=200.0, c='r', marker='o', zorder=100)
-  plt.plot(x[:,0], x[:,1], 'ko', zorder=-1)
-  plt.xlabel('x1')
-  plt.ylabel('x2')
-  plt.show(block=False)
-  time.sleep(1)
+  def create_k_docs(accu):
+    for i in range(0, k):
+      variance = min(1.0 - random.random(), 0.5) + 0.5
+      num = random.choice( nums )
+      a = np.random.normal(num, variance, (docs_per, 2))
+      accu = np.concatenate((accu, a))
+    return accu
+
+  accu = create_k_docs(accu)
+  accu = create_k_docs(accu)
+
+  for i in range(0, k*10):
+    num = random.choice( nums )
+    a = np.random.normal(4, 30, (5, 2))
+    accu = np.concatenate((accu, a))
+
+  return np.array(accu, dtype=np.float32)
 
 
 # Algorithm
+def distance(x, centroids):
+  return np.log(np.sum((x - centroids)**2, axis=1))
+
+def cost_func(x, centroids, c):
+  return (1 / x.shape[0]) * np.sum( distance(x, centroids[c]) )
+
 def initial_centroids(x, k):
   space = list(range(0, x.shape[0]))
   s = random.sample(space, k)
   return x[np.array(s)]
 
-def assign_centroids(c, x, centroids, m):
+def assign_centroids(c, x, centroids):
+  m = x.shape[0]
   for i in range(0, m):
-    c[i] = np.argmin((1 / m) * sim(x[i], centroids))
+    dist = (1 / m) * distance(x[i,:], centroids)
+    c[i] = np.argmin(dist)
   return c
-
-def sim(a, b):
-  return np.sum( (a - b)**2, axis=1 )**2
 
 def move_centroids(centroids, x, c, k):
   for j in range(0, k):
     (cids, _) = np.where(c == j)
-    try:
-      centroids[j] = (1 / len(cids)) * sum(x[[cids]])
-    except:
-      continue
-  return centroids
+    centroids[j] = (1 / len(cids)) * np.sum(x[cids], axis=0)
+  return centroids.reshape(centroids.shape[0], -1)
 
-def converged(j_history, d):
-  if d > 2:
-    diff = (j_history[d-1][0] - j_history[d][0])
-    if diff < 0:
-      return False
-    return diff <= 0.000001
+def converged(j_history, i):
+  print( j_history[i] )
+  if i > 3:
+    diff = j_history[i-1] - j_history[i]
+    return diff < 0.0000001 and not diff < 0
   return False
 
-def kmeans(x, k, num_iter=25):
+def kmeans(x, k, num_iter=40):
   j_history = []
-  (m, n) = x.shape
-  c = np.zeros((m, 1), dtype=np.float32)
+  (m, _) = x.shape
+  c = np.zeros((m, 1), dtype=np.int)
   centroids = initial_centroids(x, k)
 
-  for d in range(0, num_iter):
-    cost = J(x, centroids, c)
-    j_history.append( (cost, centroids) )
-    print( cost )
+  for i in range(0, num_iter):
+    j_history.append( cost_func(x, centroids, c) )
 
-    c = assign_centroids(c, x, centroids, m)
+    c = assign_centroids(c, x, centroids)
     centroids = move_centroids(centroids, x, c, k)
 
-    if converged(j_history, d):
-      print("converged in round {}".format(d))
+    if converged(j_history, i):
+      print("converged at iteration: {}".format(i))
       break
 
   return centroids, c, j_history
 
-def J(x, centroids, c):
-  inter, variation = 0, 0
-  (m, n) = x.shape
-  for idx, cidx in enumerate(c):
-    cidx = int(cidx)
-    inter = inter + sum( (x[idx] - centroids[cidx])**2 )**2
-    variation = variation + centroids[cidx]**2
-  inter = (1 / m) * inter
-  variation = (1 / m) * sum(variation)
-  return (inter / variation)
+
+# optima..
+class FindOptimum():
+
+  def __init__(self, x, k=2, k_iter=10, num_iter=5):
+    self.x = x
+    self.m = x.shape[0]
+    self.k = k
+    self.k_iter = k_iter
+    self.num_iter = num_iter
+
+  def search(self):
+    self.centroids, self.c, self.j_history = None, None, None
+    self.cost = np.sum(x)**2
+    self.k_best, self.in_iter = self.k, 1
+
+    iter_round = 0
+    for i in range(0, self.num_iter):
+      for k_off in range(0, self.k_iter):
+        k_next = self.k + k_off
+        centroids_, c_, j_history_ = kmeans(self.x, k_next)
+        new_J = cost_func(self.x, centroids_, c_)
+
+        print( "{}. cost: {}, k: {}".format(iter_round + k_off, new_J, k_next) )
+        if new_J < self.cost:
+          self.in_iter = (i * self.k_iter) + (k_off + 1)
+          self.cost, self.k_best = new_J, k_next
+          self.centroids, self.c, self.j_history = centroids_, c_, j_history_
+
+      iter_round = ((i + 1) * self.k_iter)
 
 
-def find_global_optimum(x, f=lambda a,b: a <= b, k=1, k_iter=10, num_iter=5):
-  centroids, c, j_history = kmeans(x, k)
-  cost, idx = J(x, centroids, c), 1
-  k_offset, k_best = 1, k
+def cluster_plot(x, centroids, c, k):
+  fig = plt.figure()
+  fig.suptitle("K means", fontsize=15)
 
-  for i in range(0, num_iter):
-    for k_off in range(0, k_iter):
-      centroids_, c_, j_history_ = kmeans(x, k + k_off)
-      new_J = J(x, centroids_, c_)
+  colors_ = set([x[0] for x in list(six.iteritems(colors.cnames))]) - set(["white", "black", "cyan", "magenta", "pink"])
+  point_colors = set(random.sample(colors_, k))
+  centroid_color = random.sample(colors_ - point_colors, 1).pop()
+  point_colors = list(point_colors)
 
-      if f(new_J, cost):
-        cost, idx, k_best, k_offset = new_J, i + 1, k + k_off, k_off
-        centroids, c, j_history = centroids_, c_, j_history_
-
-  return idx, k_offset, k_best, cost, centroids, c, j_history
-
-def animate(j_history, x):
-  for (_, cent) in j_history:
-    plotit(x, cent)
+  for i, cidx in enumerate(c):
+    plt.plot(x[i,0], x[i,1], point_colors[cidx], marker="o", zorder=-1)
+  for i in range(0, k):
+    plt.scatter(centroids[i,0], centroids[i,1], s=150.0, c=centroid_color, marker='o', zorder=100)
   plt.show()
 
+if __name__ == "__main__":
+  if False:
+    x = create_sample(15)
+    analyzer = FindOptimum(x, k=1, k_iter=5, num_iter=3)
+    analyzer.search()
+    print( "iteration: {}, cost: {}, k: {}".format( analyzer.in_iter, analyzer.cost, analyzer.k_best ) )
+    cluster_plot(x, analyzer.centroids, analyzer.c, analyzer.k_best)
 
-x = create_sample()
-idx, k_offset, k, cost, centroids, c, j_history = find_global_optimum(x)
-print(idx, k_offset, idx*k_offset, cost, k)
-animate(j_history, x)
+  else:
+    k = 10
+    x = create_sample(15)
+    centroids, c, j_history = kmeans(x, k)
+    cluster_plot(x, centroids, c, k)
+
+
 
