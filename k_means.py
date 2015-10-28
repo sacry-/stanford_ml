@@ -37,10 +37,7 @@ def create_sample(k, docs=400):
 
 # Algorithm
 def distance(x, centroids):
-  return np.log(np.sum((x - centroids)**2, axis=1))
-
-def cost_func(x, centroids, c):
-  return (1 / x.shape[0]) * np.sum( distance(x, centroids[c]) )
+  return np.linalg.norm(x - centroids, axis=1)**2
 
 def initial_centroids(x, k):
   space = list(range(0, x.shape[0]))
@@ -85,36 +82,32 @@ def kmeans(x, k, num_iter=40):
 
   return centroids, c, j_history
 
+def cost_func(x, centroids, c):
+  return (1 / x.shape[0]) * np.sum( distance(x, centroids[c.flatten()]) )
 
 # optima..
-class FindOptimum():
+def find_optimum(x, k=2, k_iter=10, num_iter=5):
+  m = x.shape[0]
+  centroids, c, j_history = None, None, None
+  cost = np.sum(x)**2
+  k_best, in_iter = k, 1
 
-  def __init__(self, x, k=2, k_iter=10, num_iter=5):
-    self.x = x
-    self.m = x.shape[0]
-    self.k = k
-    self.k_iter = k_iter
-    self.num_iter = num_iter
+  iter_round = 0
+  for i in range(0, num_iter):
+    for k_off in range(0, k_iter):
+      k_next = k + k_off
+      centroids_, c_, j_history_ = kmeans(x, k_next)
+      new_J = cost_func(x, centroids_, c_)
 
-  def search(self):
-    self.centroids, self.c, self.j_history = None, None, None
-    self.cost = np.sum(x)**2
-    self.k_best, self.in_iter = self.k, 1
+      print( "{}. cost: {}, k: {}".format(iter_round + k_off, new_J, k_next) )
+      if new_J < cost:
+        in_iter = (i * k_iter) + (k_off + 1)
+        cost, k_best = new_J, k_next
+        centroids, c, j_history = centroids_, c_, j_history_
 
-    iter_round = 0
-    for i in range(0, self.num_iter):
-      for k_off in range(0, self.k_iter):
-        k_next = self.k + k_off
-        centroids_, c_, j_history_ = kmeans(self.x, k_next)
-        new_J = cost_func(self.x, centroids_, c_)
+    iter_round = ((i + 1) * k_iter)
 
-        print( "{}. cost: {}, k: {}".format(iter_round + k_off, new_J, k_next) )
-        if new_J < self.cost:
-          self.in_iter = (i * self.k_iter) + (k_off + 1)
-          self.cost, self.k_best = new_J, k_next
-          self.centroids, self.c, self.j_history = centroids_, c_, j_history_
-
-      iter_round = ((i + 1) * self.k_iter)
+  return in_iter, cost, centroids, c
 
 
 def cluster_plot(x, centroids, c, k):
@@ -133,12 +126,12 @@ def cluster_plot(x, centroids, c, k):
   plt.show()
 
 if __name__ == "__main__":
-  if False:
+  if True:
     x = create_sample(15)
-    analyzer = FindOptimum(x, k=1, k_iter=5, num_iter=3)
-    analyzer.search()
-    print( "iteration: {}, cost: {}, k: {}".format( analyzer.in_iter, analyzer.cost, analyzer.k_best ) )
-    cluster_plot(x, analyzer.centroids, analyzer.c, analyzer.k_best)
+    in_iter, cost, centroids, c = find_optimum(x, k=1, k_iter=5, num_iter=3)
+    k_best = centroids.shape[0]
+    print( "iteration: {}, cost: {}, k: {}".format( in_iter, cost, k_best ) )
+    cluster_plot(x, centroids, c, k_best)
 
   else:
     k = 10
