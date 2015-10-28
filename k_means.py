@@ -1,15 +1,17 @@
 from __future__ import division
 
 import numpy as np
-import sklearn.decomposition as deco
+import math
 import random
+import time
 import sys
+import six
+
+import sklearn.decomposition as deco
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import colors
-import math
-import time
-import six
 
 
 # Helper
@@ -28,7 +30,8 @@ def distance(x, centroids):
   return np.linalg.norm(x - centroids, axis=1)**2
 
 def cost_func(x, centroids, c):
-  return (1 / x.shape[0]) * np.sum( distance(x, centroids[c.flatten()]) )
+  dist = distance(x, centroids[c.flatten()])
+  return (1 / x.shape[0]) * np.sum( dist )
 
 def initial_centroids(x, k):
   space = list(range(0, x.shape[0]))
@@ -45,10 +48,8 @@ def assign_centroids(c, x, centroids):
 def move_centroids(centroids, x, c, k):
   for j in range(0, k):
     (cids, _) = np.where(c == j)
-    try:
-      centroids[j] = (1 / len(cids)) * np.sum(x[cids], axis=0)
-    except:
-      pass
+    base = 1 / max(len(cids), 1)
+    centroids[j] = base * np.sum(x[cids], axis=0)
   return centroids.reshape(centroids.shape[0], -1)
 
 def converged(j_history, i):
@@ -70,14 +71,14 @@ def kmeans(x, k, num_iter=40):
     centroids = move_centroids(centroids, x, c, k)
 
     if converged(j_history, i):
-      print("converged at iteration: {}".format(i))
+      print( "converged at iter: {}".format(i) )
       break
 
-  print("cost:", j_history[-1], "k:", k )
+  print( "cost:", j_history[-1], "k:", k )
 
   return centroids, c, j_history
 
-
+# Optimize cost function
 def find_optimum(x, k=2, k_iter=10, num_iter=5):
   m = x.shape[0]
   centroids, c, j_history = None, None, None
@@ -92,7 +93,9 @@ def find_optimum(x, k=2, k_iter=10, num_iter=5):
       new_J = cost_func(x, centroids_, c_)
 
       if new_J < cost:
-        print( "{}. new cost: {}, k: {}".format(iter_round + k_off, new_J, k_next) )
+        print( "{}. new cost: {}, k: {}".format(
+          iter_round + k_off, new_J, k_next) 
+        )
         in_iter = (i * k_iter) + (k_off + 1)
         cost, k_best = new_J, k_next
         centroids, c, j_history = centroids_, c_, j_history_
@@ -101,12 +104,12 @@ def find_optimum(x, k=2, k_iter=10, num_iter=5):
 
   return in_iter, cost, centroids, c
 
-
+# Reduce dimensions
 def reduce_dimensions(x, dims=3):
   x = (x - np.mean(x, 0)) / np.std(x, 0)
   pca = deco.PCA(dims)
   y = pca.fit(x).transform(x)
-  print("Reducing columns of x {} by {} dims to {}".format(x.shape, dims, y.shape))
+  print("Reduced dims from {} to {}".format( x.shape, y.shape ))
   return y
 
 
