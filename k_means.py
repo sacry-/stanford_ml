@@ -45,11 +45,13 @@ def assign_centroids(c, x, centroids):
 def move_centroids(centroids, x, c, k):
   for j in range(0, k):
     (cids, _) = np.where(c == j)
-    centroids[j] = (1 / len(cids)) * np.sum(x[cids], axis=0)
+    try:
+      centroids[j] = (1 / len(cids)) * np.sum(x[cids], axis=0)
+    except:
+      pass
   return centroids.reshape(centroids.shape[0], -1)
 
 def converged(j_history, i):
-  print( j_history[i] )
   if i > 3:
     diff = j_history[i-1] - j_history[i]
     return diff < 0.0000001 and not diff < 0
@@ -70,6 +72,8 @@ def kmeans(x, k, num_iter=40):
     if converged(j_history, i):
       print("converged at iteration: {}".format(i))
       break
+
+  print("cost:", j_history[-1], "k:", k )
 
   return centroids, c, j_history
 
@@ -103,7 +107,6 @@ def reduce_dimensions(x, dims=3):
   pca = deco.PCA(dims)
   y = pca.fit(x).transform(x)
   print("Reducing columns of x {} by {} dims to {}".format(x.shape, dims, y.shape))
-  
   return y
 
 
@@ -149,10 +152,10 @@ def cluster_plot_2d(x, centroids, c, k):
 
 
 if __name__ == "__main__":
-  if True:
+  if False:
     x = create_sample(800, 10)
     x = reduce_dimensions(x, 2)
-    in_iter, cost, centroids, c = find_optimum(x, k=2, k_iter=20, num_iter=3)
+    in_iter, cost, centroids, c = find_optimum(x, k=1, k_iter=20, num_iter=3)
     k_best = centroids.shape[0]
     print( "iteration: {}, cost: {}, k: {}".format( in_iter, cost, k_best ) )
     cluster_plot_2d(x, centroids, c, k_best)
