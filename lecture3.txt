@@ -1,2 +1,0 @@
-Linear regression for a classification problem:
-  with a threshold possible but unresonable
