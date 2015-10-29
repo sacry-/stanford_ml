@@ -155,7 +155,14 @@ def cluster_plot_2d(x, centroids, c, k):
 
 
 if __name__ == "__main__":
-  if False:
+  modes = [
+    "optimized",
+    "single",
+    "sklearn"
+  ]
+  mode = modes[2]
+
+  if mode == "optimized":
     x = create_sample(800, 10)
     x = reduce_dimensions(x, 2)
     in_iter, cost, centroids, c = find_optimum(x, k=1, k_iter=20, num_iter=3)
@@ -163,11 +170,23 @@ if __name__ == "__main__":
     print( "iteration: {}, cost: {}, k: {}".format( in_iter, cost, k_best ) )
     cluster_plot_2d(x, centroids, c, k_best)
 
-  else:
+  elif mode == "single":
     k = 10
     x = create_sample(500, 10)
     x = reduce_dimensions(x, 2)
     centroids, c, j_history = kmeans(x, k)
+    cluster_plot_2d(x, centroids, c, k)
+
+  elif mode == "sklearn":
+    from sklearn.cluster import KMeans
+
+    x = create_sample(5000, 100)
+    x = reduce_dimensions(x, 2)
+    km = KMeans(init='k-means++',n_clusters=15, max_iter=30, n_init=20, copy_x=True)
+    km.fit(x)
+    centroids = km.cluster_centers_
+    c = km.labels_
+    k = km.n_clusters
     cluster_plot_2d(x, centroids, c, k)
 
 
